@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Grin T4 mining simulation</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <style>
+      html {
+        font-size: 16px;
+      }
+
+      body {
+        margin: 0;
+        font-size: 1.1rem;
+        font-family: Roboto, sans-serif;
+        line-height: 1.5;
+        color: #707070;
+        background-color: #F3F3F3;
+      }
+
+      .graph_container {
+        position: relative;
+      }
+
+      .graph_hover {
+        font-weight: bold;
+        position: absolute;
+        top: 16.5%;
+        right: 5%;
+      }
+
+      .graph_hover_legend {
+        font-weight: bold;
+        position: absolute;
+        top: 17%;
+        right: 16.5%;
+      }
+    </style>
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.40.1/plotly.min.js"></script>
+    <script>
+      function formatDate(stamp) {
+        var date = new Date(stamp*1000);
+        var y = date.getFullYear();
+        var m = date.getMonth()+1;
+        m = (m < 10 ? '0' : '')+m;
+        var d = date.getDate();
+        d = (d < 10 ? '0' : '')+d;
+
+        var h = date.getHours();
+        h = (h < 10 ? '0' : '')+h;
+        var mi = date.getMinutes();
+        mi = (mi < 10 ? '0' : '')+mi;
+        var s = date.getSeconds();
+        s = (s < 10 ? '0' : '')+s;
+
+        return y+'-'+m+'-'+d+' '+h+':'+mi+':'+s;
+      }
+
+      function fillGraph(graphName, points) {
+        var sets, options, x, y, y2, z, lastPointDate, i, j, hover = false;
+        if (graphName == 'difficulty') {
+          hover = true;
+          x = [];
+          y = [];
+          y2 = [];
+          z = [];
+          for (i=0;i<points.length;i++) {
+            x.push(formatDate(points[i][0]));
+            y.push(points[i][2]);
+            y2.push(points[i][3]);
+            z.push(numeral(points[i][1]).format('0,0'));
+          }
+          lastPointDate = points[points.length-1][0]*1000;
+
+          sets = [
+            {
+              name: 'Difficulty',
+              x: x,
+              y: y,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              },
+              _heights: z
+            },
+            {
+              name: 'SMA(60) block time',
+              x: x,
+              y: y2,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              },
+              yaxis: 'y2'
+            }
+          ];
+
+          options = {
+            title: '<b>Difficulty & block generation time</b>',
+            paper_bgcolor: '#F3F3F3',
+            showlegend: false,
+            xaxis: {
+              //rangeslider: {},
+              //range: [lastPointDate-86400000, lastPointDate]
+            },
+            yaxis: {
+              title: 'Difficulty',
+              color: '#3D71B1'
+            },
+            yaxis2: {
+              title: 'SMA(60) block time [s]',
+              color: '#F78227',
+              overlaying: 'y',
+              side: 'right',
+              range: [0, 180]
+            },
+            shapes: [{
+              type: 'line',
+              xref: 'x',
+              yref: 'y2',
+              x0: formatDate(points[0][0]),
+              y0: 60,
+              x1: formatDate(points[points.length-1][0]),
+              y1: 60,
+              line: {
+                color: '#666666',
+                width: 2,
+                dash: 'dot'
+              }
+            }]
+          };
+        }
+        else if (graphName == 'pow_type') {
+          hover = true;
+          x = [];
+          var yActual = [];
+          var yExpected = [];
+          var yScalingDiff = [];
+          z = [];
+          for (i=0;i<points.length;i++) {
+            x.push(formatDate(points[i][0]));
+            yActual.push(points[i][2]);
+            yExpected.push(points[i][3]);
+            yScalingDiff.push(points[i][4]);
+            z.push(numeral(points[i][1]).format('0,0'));
+          }
+          lastPointDate = points[points.length-1][0]*1000;
+
+          sets = [
+            {
+              name: 'Expected',
+              x: x,
+              y: yExpected,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              },
+              _heights: z
+            },
+            {
+              name: 'Actual',
+              x: x,
+              y: yActual,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              }
+            },
+            {
+              name: 'Scale',
+              x: x,
+              y: yScalingDiff,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              },
+              yaxis: 'y2'
+            }
+          ];
+
+          options = {
+            title: '<b>Fraction of blocks with primary PoW</b>',
+            paper_bgcolor: '#F3F3F3',
+            showlegend: true,
+            legend: {
+              orientation: 'h',
+              x: 0,
+              y: 1.15,
+              bgcolor: 'rgba(0,0,0,0)'
+            },
+            yaxis: {
+              title: 'Fraction [%]',
+              fixedrange: false
+            },
+            yaxis2: {
+              title: 'Scale',
+              color: '#2CA02C',
+              overlaying: 'y',
+              side: 'right'
+            }
+          };
+        }
+        else if (graphName == 'graph_rate') {
+          hover = true;
+          x = [];
+          var nPrim = points[0][2][0].length;
+          var yPrim = [];
+          for (i=0;i<nPrim;i++) {
+            yPrim.push([]);
+          }
+          console.log(yPrim);
+          var ySeco = [];
+          z = [];
+          for (i=0;i<points.length;i++) {
+            x.push(formatDate(points[i][0]));
+            for (j=0;j<nPrim;j++) {
+              yPrim[j].push(points[i][2][0][j]);
+            }
+            ySeco.push(points[i][2][1]);
+            z.push(numeral(points[i][1]).format('0,0'));
+          }
+
+          sets = [
+            {
+              name: 'Secondary',
+              x: x,
+              y: ySeco,
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              },
+              _heights: z
+            }
+          ];
+
+          for (j=0;j<nPrim;j++) {
+            sets.push({
+              name: j+30,
+              x: x,
+              y: yPrim[j],
+              type: 'scatter',
+              line: {
+                shape: 'spline'
+              }
+            });
+          }
+
+          options = {
+            title: '<b>Estimated mining rate</b>',
+            paper_bgcolor: '#F3F3F3',
+            showlegend: true,
+            legend: {
+              orientation: 'h',
+              x: 0,
+              y: 1.10,
+              bgcolor: 'rgba(0,0,0,0)'
+            },
+            yaxis: {
+              title: 'Mining rate [graphs/s]'
+            }
+          };
+        }
+        else {
+          return;
+        }
+
+        Plotly.newPlot(graphName, sets, options, {displayModeBar: false});
+
+        if (hover) {
+          document.getElementById(graphName).on('plotly_hover', function (data) {
+            document.getElementById(graphName+'_hover').innerHTML = 'Height: '+data.points[0].data._heights[data.points[0].pointNumber];
+          }).on('plotly_unhover', function () {
+            document.getElementById(graphName+'_hover').innerHTML = '';
+          });
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="graph_container">
+      <div id="difficulty"></div>
+      <div id="difficulty_hover" class="graph_hover"></div>
+    </div>
+    <div class="graph_container">
+      <div id="pow_type"></div>
+      <div id="pow_type_hover" class="graph_hover"></div>
+    </div>
+    <div class="graph_container">
+      <div id="graph_rate"></div>
+      <div id="graph_rate_hover" class="graph_hover"></div>
+    </div>
+    <script src="difficulty.js"></script>
+    <script src="pow_type.js"></script>
+    <script src="graph_rate.js"></script>
+  </body>
+</html>
