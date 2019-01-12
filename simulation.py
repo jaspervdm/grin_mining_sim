@@ -10,14 +10,14 @@ TAKE = DIFFICULTY_ADJUST_WINDOW+1
 
 def primary_graph_rate(edge_bits: int, height: int):
     if edge_bits == 30:
-        return 2 if height < 5000 else 10
+        return 0 if height < 50000 else 0
     if edge_bits == 31:
-        return 5 if height < 5000 else 2
+        return 1 if height < 50000 else 2
     return 0
 
 
 def secondary_graph_rate(height: int):
-    return 10 if height < 5000 else 5
+    return 36 if height < 50000 else 18
 
 
 def test_difficulty_adjustment():
@@ -47,7 +47,7 @@ def test_difficulty_adjustment():
 def simulation():
     active_edge_bits = [30, 31]
     random.seed(1337)
-    end_height = 10000
+    end_height = 100000
     t_zero = 1539806400
     t = t_zero
     t_last = t
