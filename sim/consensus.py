@@ -5,9 +5,9 @@ DIFFICULTY_ADJUST_WINDOW = 60
 SECOND_POW_EDGE_BITS = 29
 BASE_EDGE_BITS = 24
 
-DAMP_FACTOR = 3
+DIFF_DAMP_FACTOR = 3
+AR_DAMP_FACTOR = 13
 CLAMP_FACTOR = 2
-MAX_SECONDARY_SCALING = 8 << 11
 BLOCK_TIME_WINDOW = DIFFICULTY_ADJUST_WINDOW * 60
 
 
@@ -69,8 +69,7 @@ def difficulty_data_to_vector(blocks: List[Block]) -> List[HeaderInfo]:
 
 
 def secondary_pow_ratio(height: int) -> int:
-    return 30
-    # return max(0, 90 - int(height / 10080))
+    return max(0, 90 - int(height / 10080))
 
 
 def damp(actual: int, goal: int, damp_factor: int) -> int:
@@ -82,26 +81,25 @@ def clamp(actual: int, goal: int, clamp_factor: int) -> int:
 
 
 def secondary_pow_scaling(height: int, diff_data: List[HeaderInfo]) -> int:
+    diff_iter = iter(diff_data)
+    next(diff_iter)
     secondary_count = 0
-    for x in diff_data:
+    scale_sum = 0
+    for x in diff_iter:
+        scale_sum += x.scaling
         if x.is_secondary:
             secondary_count += 1
     secondary_count *= 100
 
-    scale_sum = 0
-    diff_iter = iter(diff_data)
-    next(diff_iter)
-    for diff in diff_iter:
-        scale_sum += diff.scaling
     target_pct = secondary_pow_ratio(height)
     target_count = int(DIFFICULTY_ADJUST_WINDOW * target_pct)
     adj_count = clamp(
-        damp(secondary_count, target_count, DAMP_FACTOR),
+        damp(secondary_count, target_count, AR_DAMP_FACTOR),
         target_count,
         CLAMP_FACTOR
     )
-    scale = int(scale_sum * target_pct / adj_count)
-    return max(1, min(scale, MAX_SECONDARY_SCALING))
+    scale = int(scale_sum * target_pct / max(1,adj_count))
+    return max(AR_DAMP_FACTOR, scale)
 
 
 def next_difficulty(height: int, blocks: List[Block]) -> HeaderInfo:
@@ -115,7 +113,7 @@ def next_difficulty(height: int, blocks: List[Block]) -> HeaderInfo:
         diff_sum += diff.difficulty
 
     adj_ts = clamp(
-        damp(ts_delta, BLOCK_TIME_WINDOW, DAMP_FACTOR),
+        damp(ts_delta, BLOCK_TIME_WINDOW, DIFF_DAMP_FACTOR),
         BLOCK_TIME_WINDOW,
         CLAMP_FACTOR
     )
