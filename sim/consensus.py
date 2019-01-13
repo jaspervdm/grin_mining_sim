@@ -7,6 +7,7 @@ BASE_EDGE_BITS = 24
 
 DIFF_DAMP_FACTOR = 3
 AR_DAMP_FACTOR = 13
+NEW_AR_DAMP = 0
 CLAMP_FACTOR = 2
 BLOCK_TIME_WINDOW = DIFFICULTY_ADJUST_WINDOW * 60
 
@@ -81,6 +82,15 @@ def clamp(actual: int, goal: int, clamp_factor: int) -> int:
 
 
 def secondary_pow_scaling(height: int, diff_data: List[HeaderInfo]) -> int:
+    if NEW_AR_DAMP > 0:
+        last = diff_data[-1]
+        scale = last.scaling
+        target_pct = secondary_pow_ratio(height)
+        if last.is_secondary:
+            scale -= (100 - target_pct) / NEW_AR_DAMP
+        else:
+            scale += target_pct / NEW_AR_DAMP
+        return max(AR_DAMP_FACTOR, scale)
     diff_iter = iter(diff_data)
     next(diff_iter)
     secondary_count = 0
